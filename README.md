@@ -12,7 +12,9 @@ A small local project for comparing the same Markdown prompt across multiple Oll
 |   |-- system.md
 |   `-- request.md
 |-- runs/
-|   `-- run-YYYYMMDD-HHMMSS.md
+|   |-- run-YYYYMMDD-HHMMSS.md
+|   |-- run-YYYYMMDD-HHMMSS.json
+|   `-- run-YYYYMMDD-HHMMSS.html
 `-- archive/
     `-- legacy-prompt.md
 ```
@@ -23,7 +25,7 @@ A small local project for comparing the same Markdown prompt across multiple Oll
 - `settings.json`: model name, Ollama endpoint, streaming, thinking, and terminal display settings.
 - `prompts/system.md`: assistant role, behavior, and rules.
 - `prompts/request.md`: the current user request.
-- `runs/`: timestamped outputs from each run.
+- `runs/`: timestamped Markdown, JSON, and HTML outputs from each run.
 - `archive/`: old files kept only for reference.
 
 ## Basic Run
@@ -53,6 +55,13 @@ python run_chat.py --request coding-task.md
 ```
 
 Configure the models to compare in `settings.json` under `compare_models`. Optionally add `judge_model` to have a third model evaluate the participant outputs and produce a summary report in the same Markdown run file.
+
+Each run also creates a polished HTML report in `runs/`. The report includes:
+
+- basic information for each participant model and the judge model;
+- the exact question/prompt used for the comparison;
+- each model's final answer;
+- the judge model's scoring result and recommendation.
 
 Example `settings.json`:
 
