@@ -1,7 +1,7 @@
 {
-  "model": "qwen3:14b",
+  "model": "qwen3.6:27b",
   "compare_models": [
-    "qwen3:14b",
+    "qwen3.6:27b",
     "qwen3.5:9b"
   ],
   "judge_model": "qwen3.6:35b-a3b",
