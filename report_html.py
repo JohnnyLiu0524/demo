@@ -15,7 +15,6 @@ def get_model_info(model_name, role="Participant"):
     }
 
 
-
 def format_seconds(value):
     if not isinstance(value, (int, float)):
         return "N/A"
@@ -36,7 +35,6 @@ def format_rate(value):
     return f"{value:.2f} tok/s"
 
 
-
 def ratio_percent(value, max_value):
     if not isinstance(value, (int, float)) or not isinstance(max_value, (int, float)):
         return 0
@@ -45,10 +43,8 @@ def ratio_percent(value, max_value):
     return max(2, min(100, round((value / max_value) * 100)))
 
 
-
 def get_stats(result):
     return result.get("stats") or {}
-
 
 
 def render_inline_markdown(text):
@@ -129,7 +125,7 @@ def render_markdown(text):
         line = lines[index]
         stripped = line.strip()
 
-        if stripped.startswith("```"):
+        if stripped.startswith("`"):
             if in_code:
                 flush_code()
                 in_code = False
@@ -213,7 +209,7 @@ def summarize_prompt(text, max_chars=120):
     return summary
 
 
-# Render the polished user-facing HTML report. Keep presentation details out of run_chat.py.
+# Optimized render_html_report function
 def render_html_report(
     settings,
     system_file,
@@ -223,10 +219,9 @@ def render_html_report(
     results,
     judge_result=None,
 ):
+    # Precompute data
     participant_infos = [get_model_info(result["model"]) for result in results]
-    judge_info = (
-        get_model_info(judge_result["model"], role="Judge") if judge_result is not None else None
-    )
+    judge_info = get_model_info(judge_result["model"], role="Judge") if judge_result else None
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     judge_model_name = judge_result["model"] if judge_result else "Not configured"
     participant_names = [result["model"] for result in results]
@@ -238,6 +233,7 @@ def render_html_report(
         else '<p class="muted">No judge evaluation was generated for this run.</p>'
     )
 
+    # Generate model cards
     model_cards = []
     for idx, info in enumerate(participant_infos, start=1):
         model_cards.append(
@@ -254,6 +250,7 @@ def render_html_report(
             </article>
             """
         )
+    
     if judge_info is not None:
         model_cards.append(
             f"""
@@ -270,6 +267,7 @@ def render_html_report(
             """
         )
 
+    # Generate answer cards
     answer_cards = []
     for idx, result in enumerate(results, start=1):
         answer_cards.append(
@@ -286,6 +284,7 @@ def render_html_report(
             """
         )
 
+    # Generate settings summary
     settings_summary = [
         ("Streaming", str(settings.get("stream", "unknown"))),
         ("Thinking", str(settings.get("think", "unknown"))),
@@ -296,35 +295,29 @@ def render_html_report(
         f"<div><dt>{html.escape(label)}</dt><dd>{html.escape(value)}</dd></div>"
         for label, value in settings_summary
     )
+
+    # Precompute performance data
     performance_entries = [
         ("Participant", result["model"], get_stats(result)) for result in results
     ]
     if judge_result is not None:
         performance_entries.append(("Judge", judge_result["model"], get_stats(judge_result)))
+
+    # Calculate max values for percentage calculations
     max_wall_time = max(
-        [
-            stats.get("wall_time_seconds")
-            for _, _, stats in performance_entries
-            if isinstance(stats.get("wall_time_seconds"), (int, float))
-        ]
-        or [0]
+        [stats.get("wall_time_seconds") for _, _, stats in performance_entries 
+         if isinstance(stats.get("wall_time_seconds"), (int, float))] or [0]
     )
     max_total_tokens = max(
-        [
-            stats.get("total_tokens")
-            for _, _, stats in performance_entries
-            if isinstance(stats.get("total_tokens"), (int, float))
-        ]
-        or [0]
+        [stats.get("total_tokens") for _, _, stats in performance_entries 
+         if isinstance(stats.get("total_tokens"), (int, float))] or [0]
     )
     max_output_speed = max(
-        [
-            stats.get("output_tokens_per_second")
-            for _, _, stats in performance_entries
-            if isinstance(stats.get("output_tokens_per_second"), (int, float))
-        ]
-        or [0]
+        [stats.get("output_tokens_per_second") for _, _, stats in performance_entries 
+         if isinstance(stats.get("output_tokens_per_second"), (int, float))] or [0]
     )
+
+    # Generate performance rows and efficiency bars
     performance_rows = []
     efficiency_bars = []
     for role, model_name, stats in performance_entries:
@@ -332,6 +325,7 @@ def render_html_report(
         wall_time_width = ratio_percent(stats.get("wall_time_seconds"), max_wall_time)
         token_width = ratio_percent(stats.get("total_tokens"), max_total_tokens)
         speed_width = ratio_percent(stats.get("output_tokens_per_second"), max_output_speed)
+        
         performance_rows.append(
             f"""
             <tr>
@@ -346,6 +340,7 @@ def render_html_report(
             </tr>
             """
         )
+        
         efficiency_bars.append(
             f"""
             <article class="efficiency-card">
@@ -373,6 +368,7 @@ def render_html_report(
             """
         )
 
+    # Return the complete HTML report
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -494,269 +490,226 @@ def render_html_report(
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow);      overflow: hidden;
     }}
-    .prompt-panel {{
+    .panel-pad {{
+      padding: 20px;
+    }}
+    .model-grid,
+    .answer-grid,
+    .efficiency-grid {{
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-      overflow: hidden;
-    }}
-    .prompt-block, .settings-block {{
-      padding: 22px;
-    }}
-    .settings-block {{
-      border-left: 1px solid var(--line);
-      background: #f8fafb;
-    }}
-    .prose h3, .prose h4, .prose h5,
-    .answer-body h3, .answer-body h4, .answer-body h5 {{
-      margin: 20px 0 8px;
-      line-height: 1.25;
-    }}
-    .prose p, .answer-body p {{
-      margin: 0 0 14px;
+      gap: 14px;
     }}
     .model-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }}
+    .answer-grid {{
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }}
+    .efficiency-grid {{
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }}
+    .model-card,
+    .answer-card,
+    .efficiency-card {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
     }}
     .model-card {{
       padding: 18px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--accent);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
     }}
     .judge-card {{
-      border-top-color: var(--accent-2);
+      border-color: rgba(180, 83, 9, 0.34);
+      background: #fffaf2;
     }}
-    .card-kicker {{
-      color: var(--muted);
+    .card-kicker,
+    .answer-card header span,
+    .efficiency-card header span {{
+      display: block;
+      color: var(--accent);
       font-size: 12px;
-      font-weight: 750;
+      font-weight: 760;
       text-transform: uppercase;
     }}
-    .model-card h3 {{
-      margin: 6px 0 14px;
+    .judge-card .card-kicker {{
+      color: var(--accent-2);
+    }}
+    h3 {{
+      margin: 6px 0 12px;
+      font-size: 17px;
+      line-height: 1.32;
       overflow-wrap: anywhere;
-      font-size: 20px;
-    }}
-    .performance-panel {{
-      overflow: hidden;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }}
-    .efficiency-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-      gap: 14px;
-      margin-bottom: 14px;
-    }}
-    .efficiency-card {{
-      padding: 18px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }}
-    .efficiency-card header span {{
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 750;
-    }}
-    .efficiency-card h3 {{
-      margin: 4px 0 0;
-      overflow-wrap: anywhere;
-      font-size: 18px;
-    }}
-    .bar-list {{
-      display: grid;
-      gap: 14px;
-      margin-top: 16px;
-    }}
-    .bar-label {{
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      margin-bottom: 6px;
-      font-size: 13px;
-    }}
-    .bar-label span {{
-      color: var(--muted);
-      font-weight: 650;
-    }}
-    .bar-label strong {{
-      overflow-wrap: anywhere;
-      text-align: right;
-    }}
-    .bar-track {{
-      width: 100%;
-      height: 10px;
-      overflow: hidden;
-      background: #edf2f5;
-      border-radius: 999px;
-    }}
-    .bar-fill {{
-      height: 100%;
-      min-width: 2%;
-      border-radius: inherit;
-    }}
-    .time-bar.participant-bar {{ background: #0f766e; }}
-    .time-bar.judge-bar {{ background: #b45309; }}
-    .token-bar.participant-bar {{ background: #2563eb; }}
-    .token-bar.judge-bar {{ background: #9333ea; }}
-    .speed-bar.participant-bar {{ background: #16a34a; }}
-    .speed-bar.judge-bar {{ background: #ea580c; }}
-    .performance-panel .table-wrap {{
-      margin: 0;
-      border: 0;
-      border-radius: 0;
-    }}
-    .performance-panel td:first-child span {{
-      display: block;
-      margin-top: 2px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 650;
     }}
     dl {{
       display: grid;
-      gap: 10px;
+      gap: 8px;
       margin: 0;
     }}
     dl div {{
       display: flex;
       justify-content: space-between;
       gap: 16px;
-      border-bottom: 1px solid #edf1f4;
-      padding-bottom: 8px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
     }}
     dt {{
       color: var(--muted);
       font-size: 13px;
-      font-weight: 650;
     }}
     dd {{
       margin: 0;
+      font-weight: 650;
       text-align: right;
       overflow-wrap: anywhere;
-      font-size: 13px;
-      font-weight: 700;
     }}
-    .answers {{
+    .prompt-grid {{
       display: grid;
-      gap: 16px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
     }}
-    .answer-card {{
-      overflow: hidden;
-      background: var(--panel);
+    .prompt-block {{
+      padding: 18px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      box-shadow: var(--shadow);
+      background: #fff;
     }}
-    .answer-card header {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 20px;
-      background: #f8fafb;
-      border-bottom: 1px solid var(--line);
+    .prompt-block h3 {{
+      margin-top: 0;
     }}
-    .answer-card header span {{
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-    }}
-    .answer-card header h3 {{
+    .prompt-text {{
+      max-height: 360px;
+      overflow: auto;
       margin: 0;
+      color: #26323d;
+      white-space: pre-wrap;
       overflow-wrap: anywhere;
-      font-size: 18px;
+      font: 13px/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     }}
-    .answer-body {{
-      padding: 22px;
+    .answer-card header,
+    .efficiency-card header {{
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafb;
     }}
-    .score-panel {{
-      padding: 24px;
-      border-top: 4px solid var(--accent-2);
+    .answer-card h3,
+    .efficiency-card h3 {{
+      margin-bottom: 0;
+    }}
+    .answer-body,
+    .judge-body {{
+      padding: 18px;
+      overflow-wrap: anywhere;
+    }}
+    .answer-body > :first-child,
+    .judge-body > :first-child {{
+      margin-top: 0;
+    }}
+    .answer-body > :last-child,
+    .judge-body > :last-child {{
+      margin-bottom: 0;
     }}
     .muted {{
       color: var(--muted);
     }}
     code {{
-      padding: 2px 6px;
-      background: #eef2f5;
+      padding: 2px 5px;
       border-radius: 5px;
+      background: #eef3f6;
       font-size: 0.92em;
     }}
     pre {{
       overflow: auto;
       padding: 14px;
-      background: #111827;
-      color: #f8fafc;
       border-radius: 8px;
+      background: #15202b;
+      color: #eef8f7;
+      line-height: 1.55;
     }}
     pre code {{
       padding: 0;
       background: transparent;
       color: inherit;
     }}
-    ul {{
-      margin: 0 0 16px 20px;
-      padding: 0;
-    }}
     .table-wrap {{
       overflow-x: auto;
-      margin: 16px 0;
-      border: 1px solid var(--line);
-      border-radius: 8px;
     }}
     table {{
       width: 100%;
       border-collapse: collapse;
-      min-width: 620px;
-      background: #fff;
+      min-width: 820px;
     }}
-    th, td {{
+    th,
+    td {{
       padding: 12px 14px;
       border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
+      font-size: 14px;
     }}
     th {{
-      background: var(--accent-soft);
-      color: #12433f;
-      font-size: 13px;
+      background: #f4f8f7;
+      color: #40505c;
+      font-size: 12px;
+      text-transform: uppercase;
     }}
-    tr:last-child td {{
-      border-bottom: 0;
-    }}
-    footer {{
-      padding: 24px 0 34px;
+    td span {{
+      display: block;
       color: var(--muted);
-      border-top: 1px solid var(--line);
+      font-size: 12px;
+    }}
+    .bar-list {{
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+    }}
+    .bar-label {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+      color: var(--muted);
       font-size: 13px;
     }}
-    @media (max-width: 780px) {{
-      .metrics, .prompt-panel {{
+    .bar-label strong {{
+      color: var(--ink);
+      white-space: nowrap;
+    }}
+    .bar-track {{
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #edf2f5;
+    }}
+    .bar-fill {{
+      height: 100%;
+      border-radius: inherit;
+    }}
+    .participant-bar {{
+      background: var(--accent);
+    }}
+    .judge-bar {{
+      background: var(--accent-2);
+    }}
+    .footer {{
+      padding-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+    @media (max-width: 820px) {{
+      .metrics,
+      .prompt-grid,
+      .answer-grid {{
         grid-template-columns: 1fr;
       }}
-      .metric-wide {{
-        grid-column: auto;
+      .hero-inner {{
+        padding-top: 38px;
       }}
-      .settings-block {{
-        border-left: 0;
-        border-top: 1px solid var(--line);
-      }}
-      .answer-card header {{
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 6px;
+      .section-head {{
+        display: block;
       }}
     }}
   </style>
@@ -764,17 +717,26 @@ def render_html_report(
 <body>
   <header class="hero">
     <div class="wrap hero-inner">
-      <p class="eyebrow">Local Ollama PK Report</p>
+      <p class="eyebrow">Ollama Model Comparison</p>
       <h1>Model Comparison Report</h1>
-      <p class="subtitle">A reader-friendly report with participant model details, prompt information, model answers, efficiency metrics, and judge scoring.</p>
+      <p class="subtitle">{html.escape(question_summary)}</p>
       <div class="metrics">
         <div class="metric metric-primary">
-          <span>Participant Models</span>
+          <span>Participants</span>
           <strong>{html.escape(participant_summary)}</strong>
         </div>
-        <div class="metric"><span>Judge Model</span><strong>{html.escape(judge_model_name)}</strong></div>
-        <div class="metric"><span>Generated At</span><strong>{html.escape(generated_at)}</strong></div>
-        <div class="metric metric-wide"><span>User Request</span><strong>{html.escape(question_summary)}</strong></div>
+        <div class="metric">
+          <span>Judge</span>
+          <strong>{html.escape(judge_model_name)}</strong>
+        </div>
+        <div class="metric">
+          <span>Generated</span>
+          <strong>{html.escape(generated_at)}</strong>
+        </div>
+        <div class="metric metric-wide">
+          <span>Files</span>
+          <strong>System: {html.escape(str(system_file))} / Request: {html.escape(str(request_file))}</strong>
+        </div>
       </div>
     </div>
   </header>
@@ -783,65 +745,35 @@ def render_html_report(
     <section>
       <div class="section-head">
         <div>
-          <h2>Prompt Information</h2>
-          <p class="hint">The full user request used for this comparison.</p>
-        </div>
-      </div>
-      <div class="panel prompt-panel">
-        <div class="prompt-block prose">
-          {render_markdown(user_request)}
-        </div>
-        <aside class="settings-block">
-          <dl>
-            <div><dt>System prompt file</dt><dd>{html.escape(str(system_file))}</dd></div>
-            <div><dt>Request file</dt><dd>{html.escape(str(request_file))}</dd></div>
-            {settings_items}
-          </dl>
-        </aside>
-      </div>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <div>
-          <h2>Model Information</h2>
-          <p class="hint">Basic information for participant and judge models.</p>
+          <h2>Models</h2>
+          <p class="hint">Configured participants and optional judge for this run.</p>
         </div>
       </div>
       <div class="model-grid">
-        {''.join(model_cards)}
+        {"".join(model_cards)}
       </div>
     </section>
 
     <section>
       <div class="section-head">
         <div>
-          <h2>Efficiency Metrics</h2>
-          <p class="hint">Latency, token usage, and generation speed. The bars show quick comparisons; the table keeps exact values.</p>
+          <h2>Run Context</h2>
+          <p class="hint">Input files, prompts, and key runtime settings.</p>
         </div>
       </div>
-      <div class="efficiency-grid">
-        {''.join(efficiency_bars)}
-      </div>
-      <div class="performance-panel">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Wall-clock time</th>
-                <th>Ollama total time</th>
-                <th>Prompt tokens</th>
-                <th>Output tokens</th>
-                <th>Total tokens</th>
-                <th>Output speed</th>
-                <th>Overall speed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {''.join(performance_rows)}
-            </tbody>
-          </table>
+      <div class="panel panel-pad">
+        <dl>
+          {settings_items}
+        </dl>
+        <div class="prompt-grid" style="margin-top: 18px;">
+          <article class="prompt-block">
+            <h3>System Prompt</h3>
+            <pre class="prompt-text">{html.escape(system_prompt)}</pre>
+          </article>
+          <article class="prompt-block">
+            <h3>User Request</h3>
+            <pre class="prompt-text">{html.escape(user_request)}</pre>
+          </article>
         </div>
       </div>
     </section>
@@ -849,12 +781,12 @@ def render_html_report(
     <section>
       <div class="section-head">
         <div>
-          <h2>Model Answers</h2>
-          <p class="hint">The final answer from each participant model.</p>
+          <h2>Answers</h2>
+          <p class="hint">Participant model responses rendered from markdown.</p>
         </div>
       </div>
-      <div class="answers">
-        {''.join(answer_cards)}
+      <div class="answer-grid">
+        {"".join(answer_cards)}
       </div>
     </section>
 
@@ -862,20 +794,47 @@ def render_html_report(
       <div class="section-head">
         <div>
           <h2>Judge Evaluation</h2>
-          <p class="hint">Scores, comments, and recommendation from the judge model.</p>
+          <p class="hint">Evaluation output when a judge model is configured.</p>
         </div>
       </div>
-      <div class="panel score-panel prose">
+      <div class="panel judge-body">
         {score_section}
       </div>
     </section>
-  </main>
 
-  <footer>
-    <div class="wrap">Generated by run_chat.py from {html.escape(str(system_file))} and {html.escape(str(request_file))}.</div>
-  </footer>
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>Efficiency</h2>
+          <p class="hint">Timing, token usage, and generation rates reported by Ollama.</p>
+        </div>
+      </div>
+      <div class="panel table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Wall Time</th>
+              <th>Total Duration</th>
+              <th>Prompt Tokens</th>
+              <th>Output Tokens</th>
+              <th>Total Tokens</th>
+              <th>Output Speed</th>
+              <th>Overall Speed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {"".join(performance_rows)}
+          </tbody>
+        </table>
+      </div>
+      <div class="efficiency-grid" style="margin-top: 14px;">
+        {"".join(efficiency_bars)}
+      </div>
+    </section>
+
+    <p class="footer">Generated by the local comparison runner.</p>
+  </main>
 </body>
 </html>
 """
-
-
